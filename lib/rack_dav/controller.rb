@@ -10,7 +10,7 @@ module RackDAV
       @response = response
       @options = options
       @resource = resource_class.new(url_unescape(request.path_info), @options)
-      raise Forbidden if request.path_info.include?('../')
+      raise Forbidden if request.path_info.include?('..')
     end
     
     def url_escape(s)
@@ -26,9 +26,9 @@ module RackDAV
     end    
     
     def options
-      response["Allow"] = 'OPTIONS,HEAD,GET,PUT,POST,DELETE,PROPFIND,PROPPATCH,MKCOL,COPY,MOVE,LOCK,UNLOCK'
-      response["Dav"] = "2"
-      response["Ms-Author-Via"] = "DAV"
+      response["Allow"] = 'OPTIONS,HEAD,GET,PUT,POST,DELETE,PROPFIND,PROPPATCH,MKCOL,COPY,MOVE'
+      response["DAV"] = "1,2"
+      response["MS-Author-Via"] = "DAV"
     end
     
     def head
@@ -53,6 +53,7 @@ module RackDAV
       raise Forbidden if resource.collection?
       map_exceptions do
         resource.put(request, response)
+        response.status = Created
       end
     end
 
@@ -63,6 +64,7 @@ module RackDAV
     end
 
     def delete
+      raise NotFound if not resource.exist?
       delete_recursive(resource, errors = [])
       
       if errors.empty?
@@ -75,6 +77,8 @@ module RackDAV
     end
     
     def mkcol
+      raise MethodNotAllowed if resource.exist?
+      raise UnsupportedMediaType if !request.body.read.empty?
       map_exceptions do
         resource.make_collection
       end
@@ -84,16 +88,18 @@ module RackDAV
     def copy
       raise NotFound if not resource.exist?
       
-      dest_uri = URI.parse(env['HTTP_DESTINATION'])
-      destination = url_unescape(dest_uri.path)
-
-      raise BadGateway if dest_uri.host and dest_uri.host != request.host
+      destination = parse_uri(env['HTTP_DESTINATION'])
+      
       raise Forbidden if destination == resource.path
       
-      dest = resource_class.new(destination, @options)
-      dest = dest.child(resource.name) if dest.collection?
+      dest = resource_class.new(destination,@options)
+      
+      dest = dest.child(resource.name) if dest.collection? && !resource.collection?
       
       dest_existed = dest.exist?
+      
+      raise Conflict if !dest.parent.exist?
+      raise PreconditionFailed if dest.exist? && !overwrite?
       
       copy_recursive(resource, dest, depth, errors = [])
       
@@ -111,18 +117,17 @@ module RackDAV
     def move
       raise NotFound if not resource.exist?
 
-      dest_uri = URI.parse(env['HTTP_DESTINATION'])
-      destination = url_unescape(dest_uri.path)
-      
-      raise BadGateway if dest_uri.host and dest_uri.host != request.host
+      destination = parse_uri(env['HTTP_DESTINATION'])
+
       raise Forbidden if destination == resource.path
       
       dest = resource_class.new(destination, @options)
-      dest = dest.child(resource.name) if dest.collection?
+      dest = dest.child(resource.name) if dest.collection? && !resource.collection?
       
       dest_existed = dest.exist?
       
       raise Conflict if depth <= 1
+      raise PreconditionFailed if dest.exist? && !overwrite?
       
       copy_recursive(resource, dest, depth, errors = [])
       delete_recursive(resource, errors)
@@ -145,13 +150,13 @@ module RackDAV
         names = resource.property_names
       else
         names = request_match("/propfind/prop/*").map { |e| e.name }
-        raise BadRequest if names.empty?
+        names = resource.property_names if names.empty?
       end
 
       multistatus do |xml|
         for resource in find_resources
           xml.response do
-            xml.href "http://#{host}#{url_escape resource.path}"
+            xml.href uri(resource.path)
             propstats xml, get_properties(resource, names)
           end
         end
@@ -167,21 +172,21 @@ module RackDAV
       multistatus do |xml|
         for resource in find_resources
           xml.response do
-            xml.href "http://#{host}#{resource.path}"
+            xml.href uri(resource.path)
             propstats xml, set_properties(resource, prop_set)
           end
         end
       end
 
-      resource.save
+      #resource.save
     end
 
     def lock
       raise NotFound if not resource.exist?
 
-      lockscope = request_match("/lockinfo/lockscope/*")[0].name
-      locktype = request_match("/lockinfo/locktype/*")[0].name
-      owner = request_match("/lockinfo/owner/href")[0]
+      lockscope = request_match("/lockinfo/lockscope/*").first.name
+      locktype = request_match("/lockinfo/locktype/*").first.name
+      owner = request_match("/lockinfo/owner/href").first
       locktoken = "opaquelocktoken:" + sprintf('%x-%x-%s', Time.now.to_i, Time.now.sec, resource.etag)
 
       response['Lock-Token'] = locktoken
@@ -219,6 +224,14 @@ module RackDAV
       @request.env
     end
     
+    def parse_uri uri
+      @options[:base_uri] ? url_unescape(URI.parse(uri).path.gsub(/#{Regexp.escape(@options[:base_uri])}/,'/')) : url_unescape(URI.parse(uri).path)
+    end
+    
+    def uri path
+      @options[:base_uri] ? "http://#{host}#{@options[:base_uri].gsub(/^(.*)\/$/,'\\1')}#{url_escape(path)}" : "http://#{host}#{url_escape(path)}"
+    end
+    
     def host
       env['HTTP_HOST']
     end
@@ -235,7 +248,7 @@ module RackDAV
       end
     end
 
-    def overwrite
+    def overwrite?
       env['HTTP_OVERWRITE'].to_s.upcase != 'F'
     end
 
@@ -265,7 +278,7 @@ module RackDAV
     def copy_recursive(res, dest, depth, errors)
       map_exceptions do
         if dest.exist?
-          if overwrite
+          if overwrite?
             delete_recursive(dest, errors)
           else
             raise PreconditionFailed
@@ -334,8 +347,9 @@ module RackDAV
     def response_errors(xml, errors)
       for path, status in errors
         xml.response do
-          xml.href "http://#{host}#{path}"
-          xml.status "#{request.env['HTTP_VERSION']} #{status.status_line}"
+          xml.href uri(path)
+          #xml.status "#{env['HTTP_VERSION']} #{status.status_line}" #env['HTTP_VERSION'] doesn't work
+          xml.status "HTTP/1.1 #{status.status_line}"
         end
       end
     end
@@ -383,7 +397,8 @@ module RackDAV
               end
             end
           end
-          xml.status "#{request.env['HTTP_VERSION']} #{status.status_line}"
+          #xml.status "#{env['HTTP_VERSION']} #{status.status_line}"
+          xml.status "HTTP/1.1 #{status.status_line}"
         end
       end
     end
