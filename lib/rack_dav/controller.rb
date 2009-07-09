@@ -26,7 +26,7 @@ module RackDAV
     end    
     
     def options
-      response["Allow"] = 'OPTIONS,HEAD,GET,PUT,POST,DELETE,PROPFIND,PROPPATCH,MKCOL,COPY,MOVE'
+      response["Allow"] = 'OPTIONS,HEAD,GET,PUT,POST,DELETE,PROPFIND,PROPPATCH,MKCOL,COPY,MOVE, LOCK, UNLOCK'
       response["DAV"] = "1,2"
       response["MS-Author-Via"] = "DAV"
     end
