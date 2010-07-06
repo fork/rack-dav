@@ -1,13 +1,6 @@
 module RackDAV
+  class Resource < Struct.new(:path, :options)
 
-  class Resource
-    attr_reader :path, :options
-    
-    def initialize(path, options)
-      @path = path
-      @options = options
-    end
-        
     # If this is a collection, return the child resources.
     def children
       raise NotImplementedError
@@ -22,7 +15,7 @@ module RackDAV
     def exist?
       raise NotImplementedError
     end
-    
+
     # Return the creation time.
     def creation_date
       raise NotImplementedError
@@ -32,7 +25,7 @@ module RackDAV
     def last_modified
       raise NotImplementedError
     end
-    
+
     # Set the time of last modification.
     def last_modified=(time)
       raise NotImplementedError
@@ -48,9 +41,7 @@ module RackDAV
     # If this is a collection, return
     # REXML::Element.new('D:collection')
     def resource_type
-      if collection?
-        REXML::Element.new('D:collection')
-      end
+      REXML::Element.new 'D:collection' if collection?
     end
 
     # Return the mime type of this resource.
@@ -76,36 +67,37 @@ module RackDAV
     def put(request, response)
       raise NotImplementedError
     end
-    
+
     # HTTP POST request.
     #
     # Usually forbidden.
     def post(request, response)
       raise NotImplementedError
     end
-    
+
     # HTTP DELETE request.
     #
     # Delete this resource.
     def delete
       raise NotImplementedError
     end
-    
+
     # HTTP COPY request.
     #
     # Copy this resource to given destination resource.
-    def copy(dest)
+    def copy(dest, depth)
       raise NotImplementedError
     end
-  
+
     # HTTP MOVE request.
     #
     # Move this resource to given destination resource.
-    def move(dest)
-      copy(dest)
+    def move(dest, depth)
+      # TODO make this cheap
+      copy(dest, depth)
       delete
     end
-    
+
     # HTTP MKCOL request.
     #
     # Create this resource as collection.
@@ -124,20 +116,26 @@ module RackDAV
     def display_name
       name
     end
-    
+
     def child(name, option={})
-      self.class.new(path + '/' + name, options)
+      self.class.new File.join(path, name), options
     end
-    
+
     def property_names
-      %w(creationdate displayname getlastmodified getetag resourcetype getcontenttype getcontentlength)
+      %w[ creationdate
+          displayname
+          getlastmodified
+          getetag
+          resourcetype
+          getcontenttype
+          getcontentlength ]
     end
-    
+
     def get_property(name)
       case name
       when 'resourcetype'     then resource_type
       when 'displayname'      then display_name
-      when 'creationdate'     then creation_date.xmlschema 
+      when 'creationdate'     then creation_date.xmlschema
       when 'getcontentlength' then content_length.to_s
       when 'getcontenttype'   then content_type
       when 'getetag'          then etag
@@ -161,20 +159,16 @@ module RackDAV
     end
 
     def parent
-      elements = @path.scan(/[^\/]+/)
-      return nil if elements.empty?
-      self.class.new('/' + elements[0..-2].to_a.join('/'), @options)
+      parent_path = File.dirname path
+      parent_path == path ? self : self.class.new(parent_path, options)
     end
-    
+
     def descendants
-      list = []
-      children.each do |child|
+      children.inject [] do |list, child|
         list << child
         list.concat(child.descendants)
       end
-      list
     end
 
   end
-
 end
