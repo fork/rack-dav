@@ -1,20 +1,20 @@
 #!/usr/bin/env ruby
-
+#ruby -Ilib bin/rack_dav
 require 'rubygems'
 require 'rack_dav'
 
-app = Rack::Builder.new do
+app = Rack::Builder.new {
   use Rack::ShowExceptions
   use Rack::CommonLogger
   use Rack::Reloader
   use Rack::Lint
-  
+
   run RackDAV::Handler.new
+}.to_app
 
-end.to_app
-
+Thread.new { Rack::Handler::WEBrick.run app, :Port => 3000 }
 begin
-  Rack::Handler::Mongrel.run(app, :Port => 3000)
-rescue
-  Rack::Handler::WEBrick.run(app, :Port => 3000)
+  sleep
+rescue Interrupt
+  Rack::Handler::WEBrick.shutdown
 end
