@@ -10,15 +10,14 @@ possible by subclassing RackDAV::Resource.
 
 Just install the gem from github:
 
-    $ gem sources -a http://gems.github.com
-    $ sudo gem install georgi-rack_dav
+    $ gem install rack-dav
 
 ## Quickstart
 
 If you just want to share a folder over WebDAV, you can just start a
 simple server with:
 
-    $ rack_dav
+    $ rack-dav
 
 This will start a WEBrick server on port 3000, which you can connect
 to without authentication.
@@ -28,14 +27,12 @@ to without authentication.
 Using RackDAV inside a rack application is quite easy. A simple rackup
 script looks like this:
 
-    @@ruby
-
     require 'rubygems'
-    require 'rack_dav'
+    require 'rack-dav'
      
     use Rack::CommonLogger
      
-    run RackDAV::Handler.new('/path/to/docs')
+    run RackDAV::Handler.new(:root => '/path/to/docs')
 
 ## Implementing your own WebDAV resource
 
@@ -46,8 +43,6 @@ Each resource will be initialized with a path, which should be used to
 find the real resource.
 
 RackDAV::Handler needs to be initialized with the actual resource class:
-
-    @@ruby
 
     RackDAV::Handler.new(:resource_class => MyResource)
 
@@ -105,4 +100,4 @@ Download or fork the project on its [Github page][2]
 
 
 [1]: http://github.com/chneukirchen/rack
-[2]: http://github.com/georgi/rack_dav
+[2]: http://github.com/fork/rack-dav
