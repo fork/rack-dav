@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# usage: bin/rack-dav [DOCROOT]
+
+require 'rubygems'
+
+lib = File.join File.dirname(__FILE__), '..', 'lib'
+lib = File.expand_path lib
+$: << lib
+require 'rack-dav'
+
+app = Rack::Builder.new {
+  use Rack::ShowExceptions
+#  use Rack::CommonLogger
+#  use Rack::Reloader
+  use Rack::Lint
+
+  docroot = ARGV.empty?? Dir.pwd : File.expand_path(ARGV.first)
+  run RackDAV::Handler.new(:root => docroot)
+}.to_app
+
+Thread.new { Rack::Handler::WEBrick.run app, :Port => 3000 }
+begin
+  puts 'Press CONTROL-C to quit...'
+  sleep # wait for Interrupt
+rescue Interrupt
+  Rack::Handler::WEBrick.shutdown
+end
