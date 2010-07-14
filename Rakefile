@@ -1,3 +1,5 @@
+# encoding: UTF-8
+
 require 'rubygems'
 require 'rake'
 
@@ -6,11 +8,14 @@ begin
   Jeweler::Tasks.new do |gem|
     gem.name = "RackDAV"
     gem.summary = %Q{WebDAV handler for Rack.}
-    gem.description = %Q{TODO: longer description of your gem}
+    gem.description = %Q{WebDAV handler for Rack.}
     gem.email = "florian.assmann@monkey-patch.me"
-    gem.homepage = "http://github.com/madbang/RackDAV"
-    gem.authors = ["Florian Aßmann"]
+    gem.homepage = "http://src.fork.de/rack-dav"
+    gem.authors = ["Florian Aßmann", "Matthias Georgi"]
+    gem.executables << 'bin/rack-dav'
     gem.add_development_dependency "riot", ">= 0"
+    gem.add_dependency "nokogiri"
+    gem.add_dependency "rack"
     # gem is a Gem::Specification... see http://www.rubygems.org/read/chapter/20 for additional settings
   end
   Jeweler::GemcutterTasks.new
