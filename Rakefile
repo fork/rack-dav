@@ -1,4 +1,4 @@
-# encoding: UTF-8
+# -*- encoding: utf-8 -*-
 
 require 'rubygems'
 require 'rake'
@@ -9,10 +9,10 @@ begin
     gem.name = "RackDAV"
     gem.summary = %Q{WebDAV handler for Rack.}
     gem.description = %Q{WebDAV handler for Rack.}
-    gem.email = "florian.assmann@monkey-patch.me"
+    gem.email = "src@fork.de"
     gem.homepage = "http://src.fork.de/rack-dav"
     gem.authors = ["Florian Aßmann", "Matthias Georgi"]
-    gem.executables << 'bin/rack-dav'
+    gem.executables << 'rack-dav'
     gem.add_development_dependency "riot", ">= 0"
     gem.add_dependency "nokogiri"
     gem.add_dependency "rack"
