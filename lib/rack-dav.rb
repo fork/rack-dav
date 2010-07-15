@@ -1,19 +1,18 @@
 require 'time'
 require 'fileutils'
 require 'pathname'
-require 'rexml/document' # TODO use nokogiri, skip builder dependency
 require 'uri'
 
-require 'rubygems'
-require 'builder' # TODO either add dependency in gemspec or use nokogiri
+require 'nokogiri'
 require 'rack'
 
 module RackDAV
-  autoload :FileResource, 'rack-dav/file_resource'
-end
 
-require 'rack-dav/builder_namespace'
-require 'rack-dav/http_status'
-require 'rack-dav/resource'
-require 'rack-dav/handler'
-require 'rack-dav/controller'
+  lib_path = "#{ File.dirname __FILE__ }/rack-dav"
+
+  REQ = proc { |basename| require "#{ lib_path }/#{ basename }" }
+  %w[ http_status resource handler controller ].each(&REQ)
+
+  autoload :FileResource, "#{ lib_path }/file_resource"
+
+end

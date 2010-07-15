@@ -17,18 +17,21 @@ module RackDAV
     GUARDS['lock']      = %w[ MissingResource ]
     GUARDS.freeze
 
-    def run
-      if env['HTTP_X_LITMUS']
-        STDERR.puts
-        STDERR.puts "******** #{ env['HTTP_X_LITMUS'] } ********"
-        STDERR.puts
-      end
+    def self.run(request, response, options)
+      response.status = new(request, response, options).run
+    rescue HTTPStatus::Status => status
+      response.status = status.code
+    ensure
+      response.body = [response.body] if String === response.body # enumerable
+    end
 
+    def run
+      litmus = env['HTTP_X_LITMUS'] and STDERR.puts "\n**** #{ litmus }\n"
       method = request.request_method.downcase
-      guard method
 
       begin
-        response.status = send "dav_#{ method }"
+        guard method
+        send "dav_#{ method }"
       rescue => e
         map_exception e
       end
@@ -141,7 +144,7 @@ module RackDAV
       end
 
       def map_exception(e)
-        STDERR.puts e.message, "  #{ e.backtrace.join "\n  " }"
+        STDERR.puts e.message, "  #{ e.backtrace.join "\n  " }" if $-d
 
         case e
         when URI::InvalidURIError then raise BadRequest
